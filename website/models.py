@@ -18,3 +18,4 @@ class User(db.Model, UserMixin):
     notes = db.relationship('Note')
     google_token = db.Column(db.String(150), unique=True)
     google_authenticator = db.Column(db.Boolean)
+    email_authenticator = db.Column(db.Boolean)

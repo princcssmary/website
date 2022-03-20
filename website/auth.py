@@ -4,6 +4,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
 from flask_login import login_user, login_required, logout_user, current_user
 import pyotp
+from .email_sender import EmailSender
+
+
 
 auth = Blueprint('auth', __name__)
 
@@ -21,6 +24,9 @@ def login():
                 login_user(user, remember=True)
                 if current_user.google_authenticator:
                     return redirect(url_for("auth.login_2fa_form", email=email))
+
+                if current_user.email_authenticator:
+                    return redirect(url_for("auth.login_3fa_form", email=email))
                 return redirect(url_for('views.home'))
             else:
                 flash('Incorrect password, try again.', category='error')
@@ -45,17 +51,45 @@ def login_2fa_form():
         # verifying submitted OTP with PyOTP
 
         if pyotp.TOTP(google_token).verify(otp):
-            pass
-        else:
-            valid = False
-
-        if valid == True:
-            return redirect(url_for('views.home'))
+            if current_user.email_authenticator:
+                sender_mail = EmailSender([email], str(otp))
+                sender_mail.start()
+                sender_mail.send()
+                return redirect(url_for("auth.login_3fa_form", email=email))
+            else:
+                return redirect(url_for('views.home'))
 
         flash("You have supplied an invalid 2FA token!", "danger")
         return redirect(url_for("auth.login_2fa_form", email=email))
 
     return render_template("login_2fa.html", email=email)
+
+@auth.route("/login/3fa/", methods=['GET', 'POST'])
+def login_3fa_form():
+    email = request.args.get('email')
+    valid = True
+    if request.method == 'POST':
+        # getting secret key used by user
+        email = request.args.get('email')
+        user = User.query.filter_by(email=email).first()
+        google_token = current_user.google_token
+        totp = pyotp.TOTP(google_token)
+        otp = totp.now()
+        # getting OTP provided by user
+        otp = int(request.form.get("otp"))
+        print(google_token)
+        # verifying submitted OTP with PyOTP
+        sender_mail = EmailSender([email], str(totp.now()))
+        sender_mail.start()
+        sender_mail.send()
+        if pyotp.TOTP(google_token).verify(otp):
+            return redirect(url_for('views.home'))
+
+        flash("You have supplied an invalid 2FA token!", "danger")
+
+        return redirect(url_for("auth.login_3fa_form", email=email))
+
+    return render_template("login_3fa.html", email=email)
 
 
 @auth.route('/logout')

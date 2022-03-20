@@ -36,6 +36,12 @@ def authenticator():
         else:
             print("Ggg")
             user.google_authenticator = False
+        if request.form.get('email_token'):
+            print(request.form.get('email_token'), 'sdsdsd')
+            user.email_authenticator = True
+        else:
+            print("Ggg")
+            user.email_authenticator = False
         db.session.commit()
     return render_template("authenticator.html", user=current_user, secret=current_user.google_token)
 
