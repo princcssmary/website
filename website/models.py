@@ -16,3 +16,5 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(150))
     first_name = db.Column(db.String(150))
     notes = db.relationship('Note')
+    google_token = db.Column(db.String(150), unique=True)
+    google_authenticator = db.Column(db.Boolean)
