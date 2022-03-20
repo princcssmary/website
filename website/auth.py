@@ -19,8 +19,9 @@ def login():
             if check_password_hash(user.password, password):
                 flash('Logged in successfully!', category='success')
                 login_user(user, remember=True)
-                #return redirect(url_for('views.home'))
-                return redirect(url_for("auth.login_2fa_form"))
+                if current_user.google_authenticator:
+                    return redirect(url_for("auth.login_2fa_form", email=email))
+                return redirect(url_for('views.home'))
             else:
                 flash('Incorrect password, try again.', category='error')
         else:
@@ -31,24 +32,30 @@ def login():
 
 @auth.route("/login/2fa/", methods=['GET', 'POST'])
 def login_2fa_form():
-    secret = pyotp.random_base32()
+    email = request.args.get('email')
+    valid = True
     if request.method == 'POST':
         # getting secret key used by user
-        secret = request.form.get("secret")
+        email = request.args.get('email')
+        user = User.query.filter_by(email=email).first()
+        google_token = user.google_token
         # getting OTP provided by user
         otp = int(request.form.get("otp"))
-
+        print(google_token)
         # verifying submitted OTP with PyOTP
-        if pyotp.TOTP(secret).verify(otp):
-            # inform users if OTP is valid
-            flash("The TOTP 2FA token is valid", "success")
-            return redirect(url_for("auth.login_2fa_form"))
-        else:
-            # inform users if OTP is invalid
-            flash("You have supplied an invalid 2FA token!", "danger")
-            return redirect(url_for("auth.login_2fa_form"))
 
-    return render_template("login_2fa.html", secret=secret)
+        if pyotp.TOTP(google_token).verify(otp):
+            pass
+        else:
+            valid = False
+
+        if valid == True:
+            return redirect(url_for('views.home'))
+
+        flash("You have supplied an invalid 2FA token!", "danger")
+        return redirect(url_for("auth.login_2fa_form", email=email))
+
+    return render_template("login_2fa.html", email=email)
 
 
 @auth.route('/logout')
@@ -60,6 +67,8 @@ def logout():
 
 @auth.route('/sign-up', methods=['GET', 'POST'])
 def sign_up():
+    secret = pyotp.random_base32()
+    print(secret)
     if request.method == 'POST':
         email = request.form.get('email')
         first_name = request.form.get('firstName')
@@ -81,11 +90,11 @@ def sign_up():
             new_user = User(email=email,
                             first_name=first_name,
                             password=generate_password_hash(password1, method='sha256'),
-                            google_token=pyotp.random_base32())
+                            google_token=secret)
             db.session.add(new_user)
             db.session.commit()
             login_user(new_user, remember=True)
             flash('Account created!', category='success')
             return redirect(url_for('views.home'))
 
-    return render_template("sign_up.html", user=current_user)
+    return render_template("sign_up.html", user=current_user, secret=secret)

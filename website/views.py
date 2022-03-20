@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, flash, jsonify
 from flask_login import login_required, current_user
-from .models import Note
+from .models import Note, User
 from . import db
 import json
 
@@ -22,6 +22,22 @@ def home():
             flash('Note added!', category='success')
 
     return render_template("home.html", user=current_user)
+
+
+@views.route('/authenticator', methods=['GET', 'POST'])
+@login_required
+def authenticator():
+    print(current_user.google_token)
+    if request.method == 'POST':
+        user = User.query.filter_by(id=current_user.id).first()
+        if request.form.get('google_token'):
+            print(request.form.get('google_token'), 'sdsdsd')
+            user.google_authenticator = True
+        else:
+            print("Ggg")
+            user.google_authenticator = False
+        db.session.commit()
+    return render_template("authenticator.html", user=current_user, secret=current_user.google_token)
 
 
 @views.route('/delete-note', methods=['POST'])
